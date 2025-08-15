@@ -47,7 +47,7 @@
             align-items: center;
             justify-content: center;
             padding: 20px;
-            /* DÒNG NÀY SỬA LỖI BỊ CHE MẤT SƠ ĐỒ */
+            /* This line fixes the scrolling issue */
             overflow: auto; 
         }
     </style>
@@ -60,9 +60,7 @@
 Chủ đề chính
  Nhánh cấp 1
   Nhánh cấp 2
-   Nhánh cấp 3
-    Nhánh cấp 4
- Nhánh cấp 1 khác"></textarea>
+   Nhánh cấp 3"></textarea>
     </div>
 
     <div class="container">
@@ -73,7 +71,7 @@ Chủ đề chính
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     
     <script>
-        // CẤU HÌNH MÀU SẮC CHO SƠ ĐỒ
+        // Configures the custom fading colors
         mermaid.initialize({
             startOnLoad: false,
             theme: 'base',
@@ -100,7 +98,7 @@ Chủ đề chính
             }
         });
 
-        // HÀM VẼ SƠ ĐỒ
+        // Function to draw the mind map
         const inputText = document.getElementById('inputText');
         const outputDiv = document.getElementById('output');
         
@@ -126,7 +124,7 @@ Chủ đề chính
             }
         };
 
-        // Lắng nghe sự kiện người dùng gõ phím và chạy lần đầu khi tải trang
+        // Event listeners to update the chart
         inputText.addEventListener('input', generateMindmap);
         window.addEventListener('load', generateMindmap);
     </script>
