@@ -47,7 +47,7 @@
             align-items: center;
             justify-content: center;
             padding: 20px;
-            /* THÊM DÒNG NÀY ĐỂ SỬA LỖI BỊ CHE MẤT SƠ ĐỒ */
+            /* DÒNG NÀY SỬA LỖI BỊ CHE MẤT SƠ ĐỒ */
             overflow: auto; 
         }
     </style>
@@ -79,32 +79,21 @@ Chủ đề chính
             theme: 'base',
             themeVariables: {
                 'lineColor': '#7f8c8d',
-
-                // Cấp 0 (Gốc) - Đậm nhất
                 'mindmap-bkg-l0': '#2c3e50',
                 'mindmap-txt-l0': '#ffffff',
                 'mindmap-border-l0': '#2c3e50',
-
-                // Cấp 1 - Đậm vừa
                 'mindmap-bkg-l1': '#34495e',
                 'mindmap-txt-l1': '#ffffff',
                 'mindmap-border-l1': '#34495e',
-                
-                // Cấp 2 - Xám đậm
                 'mindmap-bkg-l2': '#7f8c8d',
                 'mindmap-txt-l2': '#ffffff',
                 'mindmap-border-l2': '#7f8c8d',
-
-                // Cấp 3 - Xám nhạt
                 'mindmap-bkg-l3': '#bdc3c7',
                 'mindmap-txt-l3': '#2c3e50',
                 'mindmap-border-l3': '#bdc3c7',
-
-                // Cấp 4 trở đi - Xám rất nhạt
                 'mindmap-bkg-l4': '#ecf0f1',
                 'mindmap-txt-l4': '#2c3e50',
                 'mindmap-border-l4': '#ecf0f1',
-                
                 'mindmap-bkg-def': '#ecf0f1',
                 'mindmap-txt-def': '#2c3e50',
                 'mindmap-border-def': '#ecf0f1',
@@ -130,11 +119,9 @@ Chủ đề chính
                 mermaidString += `${mermaidIndent}${line.trim()}\n`;
             }
             try {
-                // Tạo SVG từ chuỗi Mermaid
                 const { svg } = await mermaid.render('graphDiv', mermaidString);
                 outputDiv.innerHTML = svg;
             } catch (error) {
-                // Hiển thị lỗi nếu có
                 outputDiv.innerHTML = `Lỗi cú pháp: ${error.message}`;
             }
         };
@@ -142,7 +129,6 @@ Chủ đề chính
         // Lắng nghe sự kiện người dùng gõ phím và chạy lần đầu khi tải trang
         inputText.addEventListener('input', generateMindmap);
         window.addEventListener('load', generateMindmap);
-
     </script>
 </body>
 </html>
