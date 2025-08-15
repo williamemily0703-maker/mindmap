@@ -47,7 +47,7 @@
             align-items: center;
             justify-content: center;
             padding: 20px;
-            /* This line fixes the scrolling issue */
+            /* Dòng này sửa lỗi sơ đồ bị che mất khi quá dài */
             overflow: auto; 
         }
     </style>
@@ -71,7 +71,7 @@ Chủ đề chính
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     
     <script>
-        // Configures the custom fading colors
+        // Cấu hình màu sắc nhạt dần theo từng cấp
         mermaid.initialize({
             startOnLoad: false,
             theme: 'base',
@@ -98,7 +98,7 @@ Chủ đề chính
             }
         });
 
-        // Function to draw the mind map
+        // Hàm vẽ sơ đồ
         const inputText = document.getElementById('inputText');
         const outputDiv = document.getElementById('output');
         
@@ -124,7 +124,7 @@ Chủ đề chính
             }
         };
 
-        // Event listeners to update the chart
+        // Cập nhật sơ đồ khi người dùng gõ
         inputText.addEventListener('input', generateMindmap);
         window.addEventListener('load', generateMindmap);
     </script>
