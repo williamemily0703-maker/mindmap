@@ -1,182 +1,601 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Mindmap từ văn bản – gõ để vẽ</title>
-<style>
-  /* Giữ nguyên style cũ và bỏ các nút không cần */
-</style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PDF Reader & Mindmap</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+    <style>
+        /* === CÀI ĐẶT CHUNG & BIẾN CSS === */
+        :root {
+            --bg: #0b1220;
+            --panel: #0f172a;
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --accent: #60a5fa;
+            --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+            --radius: 14px;
+            /* Mindmap variables */
+            --node-w: 220px;
+            --col-gap: 120px;
+            --row-gap: 28px;
+            --left-panel-width: 380px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            height: 100%;
+            overflow: hidden;
+            font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+            background: var(--bg);
+            color: var(--text);
+        }
+        
+        /* === BỐ CỤC CHÍNH (PDF + MINDMAP) === */
+        .main-container {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .pdf-section {
+            width: 50%; /* Bắt đầu với 50% chiều rộng */
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            background-color: #1f2937;
+        }
+
+        .mindmap-section {
+            width: 50%;
+            height: 100%;
+            position: relative; /* Cần cho nút toggle */
+        }
+
+        /* Thanh kéo thay đổi kích thước */
+        .resizer {
+            width: 8px;
+            height: 100%;
+            background: #2a3b63;
+            cursor: col-resize;
+            flex-shrink: 0;
+        }
+
+        /* === KHU VỰC PDF === */
+        .pdf-toolbar {
+            background-color: var(--panel);
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            border-bottom: 1px solid #2a3b63;
+        }
+
+        .pdf-toolbar button, .pdf-toolbar input[type="file"] {
+            display: none; /* Ẩn input mặc định */
+        }
+        
+        .btn-icon {
+             background: #0a1222; color: var(--text); border: 1px solid #1f2a44; padding: 8px 10px; border-radius: 10px; font-size: 14px; cursor: pointer;
+        }
+        .btn-icon:hover { border-color:#2a3b63; }
+
+        #page-num, #page-count {
+            color: var(--text);
+        }
+
+        .pdf-viewer {
+            flex-grow: 1;
+            overflow: auto;
+            text-align: center;
+            padding: 16px;
+        }
+
+        #canvas_container {
+            position: relative;
+        }
+
+        #pdf_renderer {
+            border: 1px solid #334155;
+            box-shadow: var(--shadow);
+        }
+
+        /* === KHU VỰC MINDMAP === */
+        .app {
+            display: grid;
+            grid-template-columns: var(--left-panel-width) 1fr;
+            gap: 16px;
+            height: 100%;
+            padding: 16px;
+            transition: grid-template-columns 0.4s ease;
+        }
+
+        .left {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: transform 0.4s ease, opacity 0.3s ease;
+            position: relative;
+        }
+
+        .app.panel-closed {
+            grid-template-columns: 0px 1fr;
+        }
+        .app.panel-closed .left {
+            transform: translateX(-100%); opacity: 0; pointer-events: none;
+        }
+
+        h1 {
+            font-size: 18px; margin: 0 0 2px 0; font-weight: 650; letter-spacing: .2px; color: #f1f5f9;
+        }
+        .help { color: var(--muted); font-size: 12px; line-height: 1.5; }
+
+        textarea {
+            width: 100%; height: 100%; resize: none; padding: 14px; border-radius: 16px;
+            border: 1px solid #1f2a44; background: linear-gradient(180deg, #0c1425, #0b1220);
+            color: var(--text); outline: none; box-shadow: var(--shadow); line-height: 1.6;
+            caret-color: var(--accent); tab-size: 2;
+        }
+
+        .right {
+            position: relative; border-radius: 16px; background: linear-gradient(180deg, #0c1425, #0b1220);
+            border: 1px solid #1f2a44; overflow: hidden; box-shadow: var(--shadow); cursor: grab;
+        }
+        .right:active { cursor: grabbing; }
+
+        .canvas {
+            position: relative; min-width: 100%; min-height: 100%; transform-origin: 0 0;
+        }
+        .node {
+            position: absolute; width: var(--node-w); max-width: var(--node-w); padding: 10px 12px; border-radius: var(--radius);
+            border: 1px solid rgba(255,255,255,.08); box-shadow: 0 6px 18px rgba(0,0,0,.35); backdrop-filter: blur(4px);
+            color: #0b1220; font-weight: 600; line-height: 1.45; word-wrap: break-word; overflow-wrap: anywhere;
+            transition: transform .12s ease;
+        }
+        .node:hover { transform: translateY(-1px) scale(1.01); }
+
+        .svg-layer { position: absolute; inset: 0; pointer-events: none; }
+        .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .btn {
+            background: #0a1222; color: var(--text); border: 1px solid #1f2a44; padding: 8px 10px;
+            border-radius: 10px; font-size: 12px; cursor: pointer;
+        }
+        .btn:hover{ border-color:#2a3b63 }
+
+        #panel-toggle-btn {
+            position: absolute; /* Thay đổi thành absolute */
+            top: 20px;
+            left: calc(var(--left-panel-width) - 12px); /* Điều chỉnh vị trí */
+            z-index: 100; width: 28px; height: 28px; background: #1f2937; color: var(--text);
+            border: 1px solid #2a3b63; border-radius: 50%; cursor: pointer; display: flex;
+            align-items: center; justify-content: center; font-size: 16px;
+            transition: left 0.4s ease, transform 0.3s ease;
+        }
+        .app.panel-closed #panel-toggle-btn {
+            left: -14px; transform: scaleX(-1);
+        }
+    </style>
 </head>
+
 <body>
-<div class="app">
-  <div class="left">
-    <div class="toolbar">
-      <h1>Mindmap từ văn bản</h1>
-      <button class="btn" id="btnExportData">Lưu mindmap</button>
-      <button class="btn" id="btnImportData">Nhập mindmap</button>
-      <button class="btn" id="btnZoomIn">+</button>
-      <button class="btn" id="btnZoomOut">-</button>
+    <div class="main-container">
+        <div class="pdf-section">
+            <div class="pdf-toolbar">
+                <label for="file-upload" class="btn-icon" title="Mở File PDF">
+                    <i class="fas fa-folder-open"></i>
+                </label>
+                <input type="file" id="file-upload">
+
+                <button id="prev-page" class="btn-icon"><i class="fas fa-arrow-left"></i></button>
+                <span id="page-num">0</span> / <span id="page-count">0</span>
+                <button id="next-page" class="btn-icon"><i class="fas fa-arrow-right"></i></button>
+
+                <button id="zoom-in" class="btn-icon"><i class="fas fa-search-plus"></i></button>
+                <button id="zoom-out" class="btn-icon"><i class="fas fa-search-minus"></i></button>
+            </div>
+            <div class="pdf-viewer">
+                <div id="canvas_container">
+                    <canvas id="pdf_renderer"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="resizer" id="resizer"></div>
+
+        <div class="mindmap-section">
+            <div class="app" id="app-container">
+                <div class="left">
+                    <div class="toolbar">
+                        <h1>Mindmap</h1>
+                        <button class="btn" id="btnDownload">Tải Mindmap</button>
+                        <button class="btn" id="btnImport">Nhập Mindmap</button>
+                        <input type="file" id="fileInput" accept=".txt" style="display: none;">
+                    </div>
+                    <div class="help">
+                        • Mỗi <b>dòng</b> là một nút. Dùng <kbd>Tab</kbd> để thụt đầu dòng.<br />
+                        • Lăn chuột để <b>phóng to/thu nhỏ</b>, kéo chuột để <b>di chuyển</b>.<br />
+                    </div>
+                    <textarea id="editor" spellcheck="false" placeholder="Nhập nội dung mindmap ở đây..."></textarea>
+                </div>
+
+                <div class="right" id="viewport">
+                    <div class="canvas" id="canvas">
+                        <svg class="svg-layer" id="wires"></svg>
+                    </div>
+                </div>
+            </div>
+            <button id="panel-toggle-btn">«</button>
+        </div>
     </div>
-    <div class="help">
-      • Mỗi dòng là một nút, số dấu cách đầu dòng = cấp độ.<br>
-      • Màu nền nhạt dần theo cấp, mỗi nhánh chính màu khác nhau.<br>
-    </div>
-    <textarea id="editor" spellcheck="false"></textarea>
-  </div>
-  <div class="right" id="viewport">
-    <div class="canvas" id="canvas">
-      <svg class="svg-layer" id="wires"></svg>
-    </div>
-  </div>
-</div>
-<script>
-const editor = document.getElementById('editor');
-const canvas = document.getElementById('canvas');
-const wires = document.getElementById('wires');
-const viewport = document.getElementById('viewport');
-const btnExportData = document.getElementById('btnExportData');
-const btnImportData = document.getElementById('btnImportData');
-const btnZoomIn = document.getElementById('btnZoomIn');
-const btnZoomOut = document.getElementById('btnZoomOut');
-let zoomLevel = 1;
 
-const rootColors = ["hsl(200 85% 40%)","hsl(0 85% 45%)","hsl(120 70% 40%)","hsl(280 70% 50%)","hsl(40 90% 45%)"];
+    <script>
+        // =======================================================
+        // ==               PHẦN CODE CỦA PDF READER            ==
+        // =======================================================
+        const fileUpload = document.getElementById('file-upload');
+        const pdfRenderer = document.getElementById('pdf_renderer');
+        const pageNumSpan = document.getElementById('page-num');
+        const pageCountSpan = document.getElementById('page-count');
+        const prevPageBtn = document.getElementById('prev-page');
+        const nextPageBtn = document.getElementById('next-page');
+        const zoomInBtn = document.getElementById('zoom-in');
+        const zoomOutBtn = document.getElementById('zoom-out');
 
-editor.addEventListener('keydown', e => {
-  if (e.key === 'Tab') {
-    e.preventDefault();
-    const start = editor.selectionStart;
-    const end = editor.selectionEnd;
-    editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
-    editor.selectionStart = editor.selectionEnd = start + 2;
-    triggerUpdate();
-  }
-});
+        let pdfDoc = null;
+        let pageNum = 1;
+        let pageIsRendering = false;
+        let pageNumIsPending = null;
+        let scale = 1.5;
 
-function parseLines(text) {
-  return text.split(/\r?\n/)
-    .map((raw, idx) => {
-      const match = raw.match(/^(\s*)(.*)$/);
-      const spaces = match ? match[1].replace(/\t/g, '  ') : '';
-      return { id: idx, level: spaces.length, text: (match ? match[2] : raw).trim() };
-    })
-    .filter(n => n.text.length > 0);
-}
+        const renderPage = num => {
+            pageIsRendering = true;
+            pdfDoc.getPage(num).then(page => {
+                const viewport = page.getViewport({ scale });
+                const canvasContext = pdfRenderer.getContext('2d');
+                pdfRenderer.height = viewport.height;
+                pdfRenderer.width = viewport.width;
 
-function buildTree(nodes) {
-  const root = { id: 'root', level: -1, text: '', children: [] };
-  const stack = [root];
-  nodes.forEach(n => {
-    while (stack.length && stack[stack.length - 1].level >= n.level) stack.pop();
-    const parent = stack[stack.length - 1] || root;
-    const node = { ...n, children: [] };
-    parent.children.push(node);
-    stack.push(node);
-  });
-  return root;
-}
+                const renderContext = { canvasContext, viewport };
+                page.render(renderContext).promise.then(() => {
+                    pageIsRendering = false;
+                    if (pageNumIsPending !== null) {
+                        renderPage(pageNumIsPending);
+                        pageNumIsPending = null;
+                    }
+                });
+                pageNumSpan.textContent = num;
+            });
+        };
 
-function layoutTree(root) {
-  let y = 28;
-  const positions = new Map();
-  function measure(node) {
-    const lines = Math.ceil((node.text.length + 1) / 26);
-    return 18 * Math.max(1, lines) + 16;
-  }
-  function walk(node) {
-    if (node.id !== 'root') {
-      const x = node.level * 300 + 40;
-      const h = measure(node);
-      positions.set(node.id, { x, y, w: 220, h, level: node.level });
-      y += h + 28;
-    }
-    node.children.forEach(walk);
-  }
-  root.children.forEach(walk);
-  return { positions };
-}
+        const queueRenderPage = num => {
+            if (pageIsRendering) {
+                pageNumIsPending = num;
+            } else {
+                renderPage(num);
+            }
+        };
 
-function hslForLevel(level, rootIndex) {
-  const base = rootColors[rootIndex % rootColors.length];
-  const light = Math.max(30, 90 - level * 10);
-  return base.replace(/\d+%\)$/,(m)=>`${light}%)`);
-}
+        const showPrevPage = () => {
+            if (pageNum <= 1) return;
+            pageNum--;
+            queueRenderPage(pageNum);
+        };
 
-function draw(root, layout) {
-  const { positions } = layout;
-  wires.innerHTML = '';
-  [...canvas.querySelectorAll('.node')].forEach(n => n.remove());
-  root.children.forEach((branch, idx) => render(branch, null, idx));
+        const showNextPage = () => {
+            if (pageNum >= pdfDoc.numPages) return;
+            pageNum++;
+            queueRenderPage(pageNum);
+        };
+        
+        const zoomIn = () => {
+            if (scale >= 3.0) return;
+            scale += 0.25;
+            queueRenderPage(pageNum);
+        };
+        
+        const zoomOut = () => {
+            if (scale <= 0.25) return;
+            scale -= 0.25;
+            queueRenderPage(pageNum);
+        };
 
-  function render(node, parent, rootIdx) {
-    if (node.id !== 'root') {
-      const p = positions.get(node.id);
-      const el = document.createElement('div');
-      el.className = 'node';
-      el.style.position = 'absolute';
-      el.style.left = (p.x * zoomLevel) + 'px';
-      el.style.top = (p.y * zoomLevel) + 'px';
-      el.style.width = (p.w * zoomLevel) + 'px';
-      el.style.background = hslForLevel(node.level, rootIdx);
-      el.textContent = node.text;
-      canvas.appendChild(el);
-      if (parent && parent.id !== 'root') {
-        const a = positions.get(parent.id);
-        const x1 = a.x * zoomLevel + a.w * zoomLevel;
-        const y1 = a.y * zoomLevel + a.h / 2 * zoomLevel;
-        const x2 = p.x * zoomLevel;
-        const y2 = p.y * zoomLevel + p.h / 2 * zoomLevel;
-        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        path.setAttribute('d', `M ${x1} ${y1} C ${(x1+x2)/2} ${y1}, ${(x1+x2)/2} ${y2}, ${x2} ${y2}`);
-        path.setAttribute('stroke', '#888');
-        path.setAttribute('fill', 'none');
-        path.setAttribute('stroke-width', 2);
-        wires.appendChild(path);
-      }
-    }
-    node.children.forEach(child => render(child, node, rootIdx));
-  }
-}
 
-function triggerUpdate() {
-  const nodes = parseLines(editor.value);
-  const tree = buildTree(nodes);
-  draw(tree, layoutTree(tree));
-}
+        fileUpload.addEventListener('change', e => {
+            const file = e.target.files[0];
+            if (file.type !== 'application/pdf') {
+                alert('Vui lòng chọn một file PDF');
+                return;
+            }
 
-btnZoomIn.onclick = () => { zoomLevel *= 1.2; triggerUpdate(); };
-btnZoomOut.onclick = () => { zoomLevel /= 1.2; triggerUpdate(); };
+            const fileReader = new FileReader();
+            fileReader.onload = () => {
+                const typedarray = new Uint8Array(fileReader.result);
+                pdfjsLib.getDocument(typedarray).promise.then(pdfDoc_ => {
+                    pdfDoc = pdfDoc_;
+                    pageCountSpan.textContent = pdfDoc.numPages;
+                    pageNum = 1;
+                    renderPage(pageNum);
+                });
+            };
+            fileReader.readAsArrayBuffer(file);
+        });
 
-btnExportData.onclick = () => {
-  const data = { text: editor.value };
-  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'mindmap.json';
-  a.click();
-};
+        prevPageBtn.addEventListener('click', showPrevPage);
+        nextPageBtn.addEventListener('click', showNextPage);
+        zoomInBtn.addEventListener('click', zoomIn);
+        zoomOutBtn.addEventListener('click', zoomOut);
 
-btnImportData.onclick = () => {
-  const inp = document.createElement('input');
-  inp.type = 'file';
-  inp.accept = '.json';
-  inp.onchange = e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const obj = JSON.parse(reader.result);
-      editor.value = obj.text || '';
-      triggerUpdate();
-    };
-    reader.readAsText(file);
-  };
-  inp.click();
-};
 
-editor.addEventListener('input', triggerUpdate);
-triggerUpdate();
-</script>
+        // =======================================================
+        // ==           PHẦN CODE CỦA MINDMAP                   ==
+        // =======================================================
+        const editor = document.getElementById('editor');
+        const canvas = document.getElementById('canvas');
+        const wires = document.getElementById('wires');
+        const viewport = document.getElementById('viewport');
+        const btnDownload = document.getElementById('btnDownload');
+        const btnImport = document.getElementById('btnImport');
+        const fileInput = document.getElementById('fileInput');
+        const appContainer = document.getElementById('app-container');
+        const panelToggleBtn = document.getElementById('panel-toggle-btn');
+
+        panelToggleBtn.addEventListener('click', () => {
+            appContainer.classList.toggle('panel-closed');
+        });
+
+        let mindmapScale = 1;
+        let panX = 40;
+        let panY = 40;
+        let isPanning = false;
+        let startPanX = 0;
+        let startPanY = 0;
+
+        function applyTransform() {
+            canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${mindmapScale})`;
+        }
+
+        viewport.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const rect = viewport.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            const mouseBeforeZoomX = (mouseX - panX) / mindmapScale;
+            const mouseBeforeZoomY = (mouseY - panY) / mindmapScale;
+
+            const delta = -e.deltaY * 0.001;
+            const newScale = Math.max(0.2, Math.min(3, mindmapScale + delta));
+
+            panX = mouseX - mouseBeforeZoomX * newScale;
+            panY = mouseY - mouseBeforeZoomY * newScale;
+            mindmapScale = newScale;
+
+            applyTransform();
+        });
+
+        viewport.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            isPanning = true;
+            startPanX = e.clientX - panX;
+            startPanY = e.clientY - panY;
+            viewport.style.cursor = 'grabbing';
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (isPanning) {
+              isPanning = false;
+              viewport.style.cursor = 'grab';
+            }
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (isPanning) {
+                panX = e.clientX - startPanX;
+                panY = e.clientY - startPanY;
+                applyTransform();
+            }
+        });
+
+        editor.addEventListener('keydown', (e) => {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const start = editor.selectionStart;
+                const end = editor.selectionEnd;
+                editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
+                editor.selectionStart = editor.selectionEnd = start + 2;
+                triggerUpdate();
+            }
+        });
+
+        btnDownload.addEventListener('click', () => {
+            const blob = new Blob([editor.value], { type: 'text/plain' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'mindmap.txt';
+            a.click();
+            URL.revokeObjectURL(a.href);
+        });
+
+        btnImport.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                editor.value = event.target.result;
+                triggerUpdate();
+            };
+            reader.readAsText(file);
+            fileInput.value = '';
+        });
+
+        function parseLines(text) {
+            return text.split(/\r?\n/)
+                .map((raw, idx) => {
+                    const match = raw.match(/^(\s*)(.*)$/);
+                    const spaces = match ? match[1].replace(/\t/g, '  ') : '';
+                    const content = match ? match[2] : raw;
+                    return { id: idx, level: Math.floor(spaces.length / 2), text: content.trim() };
+                })
+                .filter(n => n.text.length > 0);
+        }
+
+        function buildTree(nodes) {
+            const root = { id: 'root', level: -1, children: [] };
+            const stack = [root];
+            nodes.forEach(n => {
+                while (stack.length && stack[stack.length - 1].level >= n.level) stack.pop();
+                const parent = stack[stack.length - 1] || root;
+                const node = { ...n, children: [] };
+                parent.children.push(node);
+                stack.push(node);
+            });
+            return root;
+        }
+
+        function layoutTree(root) {
+            const colWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--node-w')) + parseInt(getComputedStyle(document.documentElement).getPropertyValue('--col-gap'));
+            const rowGap = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--row-gap'));
+            const positions = new Map();
+            const levelHeights = new Map();
+
+            function calculateY(node, currentY) {
+                const nodeHeight = 20 + Math.ceil(node.text.length / 25) * 24 + 10;
+                let y = currentY;
+                if (levelHeights.has(node.level) && levelHeights.get(node.level) > y) {
+                    y = levelHeights.get(node.level);
+                }
+                const x = node.level * colWidth;
+                positions.set(node.id, { x, y, w: 220, h: nodeHeight });
+                let childY = y;
+                if (node.children.length > 1) {
+                    const childrenHeight = node.children.reduce((acc, child) => acc + (20 + Math.ceil(child.text.length / 25) * 24 + 10) + rowGap, 0) - rowGap;
+                    const parentPos = positions.get(node.id);
+                    parentPos.y = y + childrenHeight / 2 - parentPos.h / 2;
+                }
+                for (const child of node.children) {
+                    childY = calculateY(child, childY);
+                }
+                const newY = childY > y ? childY : y + nodeHeight + rowGap;
+                levelHeights.set(node.level, newY);
+                return newY;
+            }
+
+            let currentY = 0;
+            for (const child of root.children) {
+                currentY = calculateY(child, currentY);
+            }
+            let maxX = 0, maxY = 0;
+            positions.forEach(p => {
+                maxX = Math.max(maxX, p.x + p.w);
+                maxY = Math.max(maxY, p.y + p.h);
+            });
+            return { positions, width: maxX + colWidth, height: maxY + rowGap * 2 };
+        }
+
+        const BASE_HUES = [210, 160, 40, 300, 260, 70];
+        function hslForLevel(level, branchIndex) {
+            const hue = BASE_HUES[branchIndex % BASE_HUES.length];
+            return `hsl(${hue} 85% ${Math.max(40, 95 - level * 12)}%)`;
+        }
+
+        function draw(root, layout) {
+            const { positions, width, height } = layout;
+            canvas.style.width = width + 'px';
+            canvas.style.height = height + 'px';
+            wires.setAttribute('width', width);
+            wires.setAttribute('height', height);
+            wires.setAttribute('viewBox', `0 0 ${width} ${height}`);
+            wires.innerHTML = '';
+            const fragment = document.createDocumentFragment();
+            [...canvas.querySelectorAll('.node')].forEach(n => n.remove());
+
+            function render(node, parent, branchIndex) {
+                if (node.id === 'root') {
+                    node.children.forEach((child, index) => render(child, node, index));
+                    return;
+                }
+                const p = positions.get(node.id);
+                const el = document.createElement('div');
+                el.className = 'node';
+                el.style.left = p.x + 'px';
+                el.style.top = p.y + 'px';
+                el.style.height = p.h + 'px';
+                el.style.background = hslForLevel(node.level, branchIndex);
+                el.textContent = node.text;
+                fragment.appendChild(el);
+                if (parent && parent.id !== 'root') {
+                    const a = positions.get(parent.id);
+                    const x1 = a.x + a.w, y1 = a.y + a.h / 2, x2 = p.x, y2 = p.y + p.h / 2;
+                    const dx = Math.max(40, (x2 - x1) / 2);
+                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    path.setAttribute('d', `M ${x1} ${y1} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2}`);
+                    path.setAttribute('fill', 'none');
+                    path.setAttribute('stroke', 'rgba(148,163,184,.6)');
+                    path.setAttribute('stroke-width', '2');
+                    path.setAttribute('stroke-linecap', 'round');
+                    wires.appendChild(path);
+                }
+                node.children.forEach(child => render(child, node, branchIndex));
+            }
+            render(root, null, 0);
+            canvas.insertBefore(fragment, wires);
+        }
+
+        let raf;
+        function triggerUpdate() {
+            if (raf) cancelAnimationFrame(raf);
+            raf = requestAnimationFrame(() => {
+                const tree = buildTree(parseLines(editor.value));
+                draw(tree, layoutTree(tree));
+            });
+        }
+        editor.addEventListener('input', triggerUpdate);
+        applyTransform();
+        triggerUpdate();
+        
+        // =======================================================
+        // ==        PHẦN CODE CHO THANH KÉO RESIZER          ==
+        // =======================================================
+        const resizer = document.getElementById('resizer');
+        const pdfSection = document.querySelector('.pdf-section');
+        const mindmapSection = document.querySelector('.mindmap-section');
+        let isResizing = false;
+
+        resizer.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', () => {
+                isResizing = false;
+                document.removeEventListener('mousemove', handleMouseMove);
+                // Gỡ bỏ hiệu ứng để tránh lag khi không kéo
+                document.body.style.userSelect = '';
+                document.body.style.pointerEvents = '';
+            });
+        });
+
+        function handleMouseMove(e) {
+            if (!isResizing) return;
+            // Thêm hiệu ứng để kéo mượt hơn
+            document.body.style.userSelect = 'none';
+            document.body.style.pointerEvents = 'none';
+
+            const totalWidth = document.body.clientWidth;
+            const newPdfWidth = (e.clientX / totalWidth) * 100;
+            
+            // Giới hạn kích thước tối thiểu
+            if (newPdfWidth > 20 && newPdfWidth < 80) {
+              pdfSection.style.width = `${newPdfWidth}%`;
+              mindmapSection.style.width = `${100 - newPdfWidth}%`;
+            }
+        }
+    </script>
 </body>
 </html>
