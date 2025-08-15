@@ -1,132 +1,373 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Công cụ Mindmap Hoàn Chỉnh</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            display: flex;
-            height: 100vh;
-            margin: 0;
-            padding: 20px;
-            box-sizing: border-box;
-            gap: 20px;
-            background-color: #f0f2f5;
-        }
-        .container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-        h2 {
-            margin: 0;
-            padding: 15px 20px;
-            background-color: #34495e;
-            color: white;
-            font-size: 18px;
-        }
-        textarea {
-            flex: 1;
-            border: none;
-            padding: 20px;
-            font-size: 16px;
-            line-height: 1.6;
-            resize: none;
-            outline: none;
-            font-family: 'Courier New', Courier, monospace;
-        }
-        #output {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            /* Dòng này sửa lỗi sơ đồ bị che mất khi quá dài */
-            overflow: auto; 
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mindmap từ văn bản – gõ để vẽ</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #0f172a;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #60a5fa;
+      --node-w: 220px;
+      --node-h: auto;
+      --col-gap: 120px; /* khoảng cách ngang giữa các cấp */
+      --row-gap: 28px;  /* khoảng cách dọc tối thiểu giữa các nút */
+      --radius: 14px;
+      --shadow: 0 8px 24px rgba(0,0,0,.35);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background: radial-gradient(1200px 800px at 20% -10%, #1f2937 0%, var(--bg) 60%);
+      color: var(--text);
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 16px;
+      height: 100vh;
+      padding: 16px;
+    }
+
+    .left {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    h1 {
+      font-size: 18px;
+      margin: 0 0 2px 0;
+      font-weight: 650;
+      letter-spacing: .2px;
+      color: #f1f5f9;
+    }
+
+    .help { color: var(--muted); font-size: 12px; line-height: 1.5; }
+
+    textarea {
+      width: 100%;
+      height: 100%;
+      resize: none;
+      padding: 14px 14px 18px 14px;
+      border-radius: 16px;
+      border: 1px solid #1f2a44;
+      background: linear-gradient(180deg, #0c1425, #0b1220);
+      color: var(--text);
+      outline: none;
+      box-shadow: var(--shadow);
+      line-height: 1.6;
+      caret-color: var(--accent);
+      tab-size: 2;
+    }
+
+    .right {
+      position: relative;
+      border-radius: 16px;
+      background: linear-gradient(180deg, #0c1425, #0b1220);
+      border: 1px solid #1f2a44;
+      overflow: auto; /* tự động xuất hiện thanh cuộn khi cần */
+      box-shadow: var(--shadow);
+    }
+
+    .canvas {
+      position: relative; /* chứa các node tuyệt đối */
+      min-width: 100%;
+      min-height: 100%;
+    }
+
+    /* Nút trong mindmap */
+    .node {
+      position: absolute;
+      width: var(--node-w);
+      max-width: var(--node-w);
+      padding: 10px 12px;
+      border-radius: var(--radius);
+      border: 1px solid rgba(255,255,255,.08);
+      box-shadow: 0 6px 18px rgba(0,0,0,.35);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      color: #0b1220;
+      font-weight: 600;
+      line-height: 1.45;
+      word-wrap: break-word;
+      overflow-wrap: anywhere;
+      transition: transform .12s ease;
+    }
+    .node:hover { transform: translateY(-1px) scale(1.01); }
+    .node small { display:block; font-weight:500; color:#0b1220a6 }
+
+    /* Thanh tiêu đề khu vực kết nối */
+    .svg-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn {
+      background: #0a1222;
+      color: var(--text);
+      border: 1px solid #1f2a44;
+      padding: 8px 10px;
+      border-radius: 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .btn:hover{ border-color:#2a3b63 }
+
+    @media (max-width: 1000px) {
+      .app { grid-template-columns: 1fr; height: auto; }
+      .right { height: 70vh; }
+    }
+  </style>
 </head>
 <body>
-
-    <div class="container">
-        <h2>Nhập văn bản (1 dấu cách cho mỗi cấp)</h2>
-        <textarea id="inputText" placeholder="Ví dụ:
-Chủ đề chính
- Nhánh cấp 1
-  Nhánh cấp 2
-   Nhánh cấp 3"></textarea>
+  <div class="app">
+    <div class="left">
+      <div class="toolbar">
+        <h1>Mindmap từ văn bản</h1>
+        <button class="btn" id="btnExport">Tải ảnh PNG</button>
+        <button class="btn" id="btnSample">Nạp ví dụ</button>
+      </div>
+      <div class="help">
+        • Mỗi <b>dòng</b> là một nút. Số <b>dấu cách đầu dòng</b> = cấp độ.<br/>
+        • Gõ / xóa: sơ đồ <b>cập nhật ngay</b>. Dùng <kbd>Tab</kbd> để thụt đầu dòng (mặc định 2 dấu cách).<br/>
+        • Màu nền sẽ <b>nhạt dần theo cấp</b> để dễ theo dõi nhánh.<br/>
+      </div>
+      <textarea id="editor" spellcheck="false" placeholder="Nhập nội dung ở đây...\nVí dụ:\nChủ đề\n  Nhánh 1\n    Ý 1.1\n    Ý 1.2\n  Nhánh 2\n    Ý 2.1\n      Chi tiết 2.1.1\n  Nhánh 3"></textarea>
     </div>
 
-    <div class="container">
-        <h2>Sơ đồ tư duy (Mindmap)</h2>
-        <div id="output"></div>
+    <div class="right" id="viewport">
+      <div class="canvas" id="canvas">
+        <svg class="svg-layer" id="wires"></svg>
+      </div>
     </div>
+  </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-    
-    <script>
-        // Cấu hình màu sắc nhạt dần theo từng cấp
-        mermaid.initialize({
-            startOnLoad: false,
-            theme: 'base',
-            themeVariables: {
-                'lineColor': '#7f8c8d',
-                'mindmap-bkg-l0': '#2c3e50',
-                'mindmap-txt-l0': '#ffffff',
-                'mindmap-border-l0': '#2c3e50',
-                'mindmap-bkg-l1': '#34495e',
-                'mindmap-txt-l1': '#ffffff',
-                'mindmap-border-l1': '#34495e',
-                'mindmap-bkg-l2': '#7f8c8d',
-                'mindmap-txt-l2': '#ffffff',
-                'mindmap-border-l2': '#7f8c8d',
-                'mindmap-bkg-l3': '#bdc3c7',
-                'mindmap-txt-l3': '#2c3e50',
-                'mindmap-border-l3': '#bdc3c7',
-                'mindmap-bkg-l4': '#ecf0f1',
-                'mindmap-txt-l4': '#2c3e50',
-                'mindmap-border-l4': '#ecf0f1',
-                'mindmap-bkg-def': '#ecf0f1',
-                'mindmap-txt-def': '#2c3e50',
-                'mindmap-border-def': '#ecf0f1',
-            }
-        });
+  <script>
+    const editor = document.getElementById('editor');
+    const canvas = document.getElementById('canvas');
+    const wires = document.getElementById('wires');
+    const viewport = document.getElementById('viewport');
+    const btnExport = document.getElementById('btnExport');
+    const btnSample = document.getElementById('btnSample');
 
-        // Hàm vẽ sơ đồ
-        const inputText = document.getElementById('inputText');
-        const outputDiv = document.getElementById('output');
-        
-        const generateMindmap = async () => {
-            const text = inputText.value;
-            if (!text.trim()) {
-                outputDiv.innerHTML = 'Vui lòng nhập văn bản để tạo sơ đồ.';
-                return;
-            }
-            let mermaidString = 'mindmap\n';
-            const lines = text.split('\n');
-            for (const line of lines) {
-                if (!line.trim()) continue;
-                const indentation = line.match(/^\s*/)[0].length;
-                const mermaidIndent = '  '.repeat(indentation + 1);
-                mermaidString += `${mermaidIndent}${line.trim()}\n`;
-            }
-            try {
-                const { svg } = await mermaid.render('graphDiv', mermaidString);
-                outputDiv.innerHTML = svg;
-            } catch (error) {
-                outputDiv.innerHTML = `Lỗi cú pháp: ${error.message}`;
-            }
-        };
+    // Chặn Tab chuyển focus, thay bằng 2 dấu cách
+    editor.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        const val = editor.value;
+        editor.value = val.substring(0, start) + '  ' + val.substring(end);
+        editor.selectionStart = editor.selectionEnd = start + 2;
+        triggerUpdate();
+      }
+    });
 
-        // Cập nhật sơ đồ khi người dùng gõ
-        inputText.addEventListener('input', generateMindmap);
-        window.addEventListener('load', generateMindmap);
-    </script>
+    btnSample.addEventListener('click', () => {
+      editor.value = `Kế hoạch sản phẩm\n  Nghiên cứu thị trường\n    Phỏng vấn khách hàng\n    Phân tích đối thủ\n  Định nghĩa tính năng\n    MVP\n      Đăng ký / Đăng nhập\n      Bảng điều khiển\n    Nice-to-have\n      Tối ưu hiệu năng\n  Lộ trình\n    Q3: Alpha\n    Q4: Beta\n      Thu thập phản hồi\n  Ra mắt\n    Marketing\n      Email\n      Sự kiện\n    Hỗ trợ sau ra mắt`;
+      triggerUpdate();
+    });
+
+    function parseLines(text){
+      return text.split(/\r?\n/)
+        .map((raw, idx) => {
+          const match = raw.match(/^(\s*)(.*)$/);
+          const indent = match ? match[1] : '';
+          const content = match ? match[2] : raw;
+          const spaces = indent.replace(/\t/g, '  '); // tab = 2 spaces
+          const level = spaces.length; // mỗi dấu cách = 1 cấp
+          return { id: idx, level, text: content.trim(), raw };
+        })
+        .filter(n => n.text.length > 0);
+    }
+
+    function buildTree(nodes){
+      const root = { id: 'root', level: -1, text: 'ROOT', children: [] };
+      const stack = [root];
+      nodes.forEach(n => {
+        // Tìm cha gần nhất có level < level hiện tại
+        while (stack.length && stack[stack.length-1].level >= n.level) stack.pop();
+        const parent = stack[stack.length-1] || root;
+        const node = { ...n, children: [] };
+        parent.children.push(node);
+        stack.push(node);
+      });
+      return root;
+    }
+
+    // Bố cục: mỗi cấp lệch ngang theo cột, dọc xếp tuần tự với khoảng cách tối thiểu
+    function layoutTree(root){
+      const colWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--node-w')) + parseInt(getComputedStyle(document.documentElement).getPropertyValue('--col-gap'));
+      const rowGap = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--row-gap'));
+
+      let y = rowGap; // toạ độ y hiện tại
+      const positions = new Map(); // id -> {x, y, w, h, level}
+
+      function measure(node){
+        // đo tạm thời chiều cao dựa trên chiều dài text (ước lượng)
+        const lines = Math.ceil((node.text.length + 1) / 26);
+        const h = 18 * Math.max(1, lines) + 16; // padding + line-height
+        return h;
+      }
+
+      function walk(node){
+        if (node.id !== 'root'){
+          const x = node.level * colWidth + 40; // lề trái
+          const h = measure(node);
+          positions.set(node.id, { x, y, w: 220, h, level: node.level });
+          y += Math.max(h + rowGap, rowGap);
+        }
+        node.children.forEach(walk);
+      }
+      root.children.forEach(walk);
+
+      // Tính kích thước canvas
+      let maxX = 0, maxY = 0;
+      positions.forEach(p => { maxX = Math.max(maxX, p.x + p.w + 200); maxY = Math.max(maxY, p.y + p.h + 200); });
+      return { positions, width: Math.max(maxX, viewport.clientWidth), height: Math.max(maxY, viewport.clientHeight) };
+    }
+
+    function hslForLevel(level){
+      // màu nhạt dần khi đi xa gốc: tăng lightness theo level
+      const hue = 210; // xanh dương dịu
+      const sat = 85;
+      const light = Math.max(30, 90 - level * 10); // sâu -> nhạt
+      return `hsl(${hue} ${sat}% ${light}%)`;
+    }
+
+    function draw(root, layout){
+      const { positions, width, height } = layout;
+
+      // Cập nhật kích thước canvas & SVG
+      canvas.style.width = width + 'px';
+      canvas.style.height = height + 'px';
+      wires.setAttribute('width', width);
+      wires.setAttribute('height', height);
+      wires.innerHTML = '';
+
+      // Xoá node cũ
+      [...canvas.querySelectorAll('.node')].forEach(n => n.remove());
+
+      // Tạo nodes + dây nối
+      function render(node, parent){
+        if (node.id !== 'root'){
+          const p = positions.get(node.id);
+          const el = document.createElement('div');
+          el.className = 'node';
+          el.style.left = p.x + 'px';
+          el.style.top = p.y + 'px';
+          el.style.background = hslForLevel(node.level);
+          el.style.borderColor = 'rgba(0,0,0,.15)';
+          el.textContent = node.text;
+          canvas.appendChild(el);
+
+          if (parent && parent.id !== 'root'){
+            const a = positions.get(parent.id);
+            // Điểm từ mép phải của cha tới mép trái của con
+            const x1 = a.x + a.w;
+            const y1 = a.y + a.h/2;
+            const x2 = p.x;
+            const y2 = p.y + p.h/2;
+            const dx = Math.max(40, (x2 - x1)/2);
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', `M ${x1} ${y1} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2}`);
+            path.setAttribute('fill', 'none');
+            path.setAttribute('stroke', 'rgba(148,163,184,.6)');
+            path.setAttribute('stroke-width', '2');
+            path.setAttribute('stroke-linecap', 'round');
+            wires.appendChild(path);
+          }
+        }
+        node.children.forEach(child => render(child, node));
+      }
+      root.children.forEach(child => render(child, null));
+    }
+
+    let raf;
+    function triggerUpdate(){
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const nodes = parseLines(editor.value);
+        const tree = buildTree(nodes);
+        const layout = layoutTree(tree);
+        draw(tree, layout);
+      });
+    }
+
+    editor.addEventListener('input', triggerUpdate);
+
+    // Xuất PNG (rasterize canvas bằng foreignObject)
+    btnExport.addEventListener('click', async () => {
+      const { width, height } = wires.getBoundingClientRect();
+      // Tạo SVG bao toàn bộ canvas (nodes + wires)
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      svg.setAttribute('width', width);
+      svg.setAttribute('height', height);
+
+      // clone wires (đường nối)
+      const wiresClone = wires.cloneNode(true);
+      wiresClone.removeAttribute('class');
+      svg.appendChild(wiresClone);
+
+      // nhúng HTML nodes bằng foreignObject
+      const fo = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
+      fo.setAttribute('x', '0');
+      fo.setAttribute('y', '0');
+      fo.setAttribute('width', width);
+      fo.setAttribute('height', height);
+
+      const wrapper = document.createElement('div');
+      wrapper.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+      const nodesHtml = document.createElement('div');
+      nodesHtml.style.position = 'relative';
+      nodesHtml.style.width = width + 'px';
+      nodesHtml.style.height = height + 'px';
+      // clone các node
+      canvas.querySelectorAll('.node').forEach(n => nodesHtml.appendChild(n.cloneNode(true)));
+
+      wrapper.appendChild(nodesHtml);
+      fo.appendChild(wrapper);
+      svg.appendChild(fo);
+
+      const blob = new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = width; c.height = height;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#0b1220';
+        ctx.fillRect(0,0,width,height);
+        ctx.drawImage(img,0,0);
+        URL.revokeObjectURL(url);
+        c.toBlob((b)=>{
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(b);
+          a.download = 'mindmap.png';
+          a.click();
+        }, 'image/png');
+      };
+      img.src = url;
+    });
+
+    // Khởi tạo
+    triggerUpdate();
+  </script>
 </body>
 </html>
